@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PrReviewAgent.Application.Common.Interfaces;
 using PRReviewAgent.Infrastructure.Persistence;
+using PrReviewAgent.Infrastructure.Services;
 
 namespace PRReviewAgent.Infrastructure
 {
@@ -16,6 +17,7 @@ namespace PRReviewAgent.Infrastructure
             services.AddScoped<IApplicationDbContext>(provider =>
                 provider.GetRequiredService<AppDbContext>());
 
+            services.AddScoped<IPrService, FakePrService>();
             return services;
         }
     }
