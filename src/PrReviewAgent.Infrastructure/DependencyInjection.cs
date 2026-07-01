@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using OllamaSharp;
+using OpenAI;
 using PrReviewAgent.Application.Common.Interfaces;
-using PRReviewAgent.Infrastructure.Persistence;
 using PrReviewAgent.Infrastructure.Services;
+using PRReviewAgent.Infrastructure.Persistence;
+using System.ClientModel;
+using System.ClientModel.Primitives;
 
 namespace PRReviewAgent.Infrastructure
 {
@@ -19,10 +20,17 @@ namespace PRReviewAgent.Infrastructure
             services.AddScoped<IApplicationDbContext>(provider =>
                 provider.GetRequiredService<AppDbContext>());
 
-            var ollamaBaseUrl = configuration["Ollama:BaseUrl"] ?? "http://localhost:11434";
-            var ollamaModel = configuration["Ollama:Model"] ?? "qwen3:latest";
-            services.AddSingleton<IChatClient>(
-                new OllamaApiClient(new Uri(ollamaBaseUrl)) { SelectedModel = ollamaModel });
+            var ollamaBaseUrl = configuration["Ollama:BaseUrl"] ?? "http://localhost:11434/v1";
+            var ollamaModel = configuration["Ollama:Model"] ?? "qwen3:8b";
+            var httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+            var openAiClient = new OpenAIClient(
+                new ApiKeyCredential("ollama"),
+                new OpenAIClientOptions
+                {
+                    Endpoint = new Uri(ollamaBaseUrl),
+                    Transport = new HttpClientPipelineTransport(httpClient)
+                });
+            services.AddSingleton(openAiClient.GetChatClient(ollamaModel));
 
             services.AddScoped<IPrService, FakePrService>();
             services.AddScoped<IAiReviewService, OllamaReviewService>();

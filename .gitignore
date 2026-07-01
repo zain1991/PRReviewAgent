@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# ASP.NET Core secrets (use appsettings.Development.json for local secrets)
+appsettings.Development.json
+
 # User-specific files
 *.rsuser
 *.suo
@@ -482,3 +485,5 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+

@@ -1,12 +1,13 @@
 using System.Text.Json;
-using OllamaSharp;
-using Microsoft.Extensions.AI;
+using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
+using OpenAI.Chat;
 using PrReviewAgent.Application.Common.Interfaces;
 using PrReviewAgent.Application.Common.Models;
 
 namespace PrReviewAgent.Infrastructure.Services
 {
-    public class OllamaReviewService(IChatClient chatClient) : IAiReviewService
+    public class OllamaReviewService(ChatClient chatClient, ILogger<OllamaReviewService> logger) : IAiReviewService
     {
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
@@ -17,26 +18,36 @@ namespace PrReviewAgent.Infrastructure.Services
         {
             var messages = new List<ChatMessage>
             {
-                new(ChatRole.System, """
+                new SystemChatMessage("""
                     You are a senior code reviewer. Analyze the pull request details provided and return findings as JSON only.
                     Do not include any explanation, markdown, or text outside the JSON object.
                     Severity must be one of: Critical, Major, Minor, Info.
                     """),
-                new(ChatRole.User, BuildPrompt(prDetails))
+                new UserChatMessage(BuildPrompt(prDetails))
             };
 
-            var options = new ChatOptions
+            var options = new ChatCompletionOptions
             {
-                ResponseFormat = ChatResponseFormat.Json
+                ResponseFormat = ChatResponseFormat.CreateJsonObjectFormat()
             };
 
-            var response = await chatClient.CompleteAsync(messages, options, cancellationToken);
+            var response = await chatClient.CompleteChatAsync(messages, options, cancellationToken);
 
-            var json = response.Message.Text ?? "{}";
+            var rawText = response.Value.Content[0].Text ?? "{}";
+            logger.LogDebug("Raw AI response: {Response}", rawText);
+
+            var json = StripThinkingTags(rawText);
 
             var result = JsonSerializer.Deserialize<AiReviewResult>(json, JsonOptions);
 
             return result ?? new AiReviewResult([]);
+        }
+
+        // qwen3 wraps responses in <think>...</think> before the JSON when thinking mode is active
+        private static string StripThinkingTags(string text)
+        {
+            var stripped = Regex.Replace(text, @"<think>[\s\S]*?</think>", string.Empty).Trim();
+            return string.IsNullOrWhiteSpace(stripped) ? "{}" : stripped;
         }
 
         private static string BuildPrompt(PrDetails prDetails)
